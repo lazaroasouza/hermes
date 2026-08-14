@@ -7,7 +7,6 @@ from google import genai
 
 app = FastAPI(title="Hermes Autonomous Agent Core", version="1.0.0")
 
-# Inicializa o cliente do Gemini usando a GEMINI_API_KEY do ambiente
 api_key = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key=api_key) if api_key else None
 
@@ -29,10 +28,10 @@ async def chat_endpoint(payload: ChatPayload):
         })
 
     try:
-        # Chamada assíncrona/executada em threadpool para a LLM
+        # Modelo oficial estável
         response = await asyncio.to_thread(
             client.models.generate_content,
-            model="gemini-2.5-flash",
+            model="gemini-1.5-flash",
             contents=user_msg,
         )
         bot_reply = response.text if response.text else "Não consegui gerar uma resposta."
@@ -76,7 +75,7 @@ async def get_chat_ui():
             <h2>🤖 Hermes Autonomous Agent Core (Gemini AI)</h2>
         </div>
         <div class="chat-box" id="chatBox">
-            <div class="message bot-msg">Olá! Sou o Hermes, agora alimentado pelo Gemini AI. Como posso te ajudar hoje?</div>
+            <div class="message bot-msg">Olá! Sou o Hermes, agora alimentado pelo Gemini. Como posso te ajudar hoje?</div>
         </div>
         <div class="chat-input-area">
             <input type="text" id="userInput" placeholder="Digite sua mensagem ou instrução..." onkeydown="if(event.key==='Enter') sendMessage()">
