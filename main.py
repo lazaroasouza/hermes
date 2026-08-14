@@ -7,7 +7,7 @@ from google import genai
 
 app = FastAPI(title="Hermes Autonomous Agent Core", version="1.0.0")
 
-# Leitura flexível da variável de ambiente no Render
+# Captura flexível da chave no Render
 api_key = (
     os.getenv("GEMINI_API_KEY") or
     os.getenv("Gemini API Key") or
@@ -30,14 +30,14 @@ async def chat_endpoint(payload: ChatPayload):
     if not client:
         return JSONResponse(content={
             "status": "error",
-            "reply": "⚠️ Variável GEMINI_API_KEY não foi encontrada no ambiente do Render."
+            "reply": "⚠️ GEMINI_API_KEY não encontrada nas variáveis de ambiente do Render."
         })
 
     try:
-        # Chamada assíncrona usando o modelo oficial
+        # Modelo oficial recomendado para a nova API
         response = await asyncio.to_thread(
             client.models.generate_content,
-            model="gemini-2.5-flash",
+            model="gemini-2.0-flash",
             contents=user_msg,
         )
         bot_reply = response.text if response.text else "Não foi possível gerar uma resposta."
@@ -78,7 +78,7 @@ async def get_chat_ui():
 <body>
     <div class="chat-container">
         <div class="chat-header">
-            <h2>🤖 Hermes Autonomous Agent Core (Gemini 2.5)</h2>
+            <h2>🤖 Hermes Autonomous Agent Core (Gemini AI)</h2>
         </div>
         <div class="chat-box" id="chatBox">
             <div class="message bot-msg">Olá! Sou o Hermes. Como posso te ajudar hoje?</div>
@@ -133,7 +133,7 @@ async def get_chat_ui():
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'message bot-msg';
                 errorDiv.style.color = '#f87171';
-                errorDiv.textContent = 'Erro ao se comunicar com o servidor Hermes.';
+                errorDiv.textContent = 'Erro de comunicação com o servidor Hermes.';
                 chatBox.appendChild(errorDiv);
             } finally {
                 input.disabled = false;
