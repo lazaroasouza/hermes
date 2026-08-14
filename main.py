@@ -1,24 +1,7 @@
-﻿from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
-
-app = FastAPI(title="Hermes Autonomous Agent Core", version="0.1.0")
-
-class ChatPayload(BaseModel):
-    message: str
-
-@app.get("/", response_class=HTMLResponse)
-def read_root():
-    return "<h3>Hermes API está online! Acesse <a href='/chat' style='color:#3b82f6;'>/chat</a> para interagir.</h3>"
-
-@app.post("/api/chat")
-async def chat_endpoint(payload: ChatPayload):
-    user_msg = payload.message
-    bot_response = f"Processado pelo Hermes: Recebi sua mensagem '{user_msg}'."
-    return {"response": bot_response}
+﻿from fastapi.responses import HTMLResponse
 
 @app.get("/chat", response_class=HTMLResponse)
-async def get_chat_ui():
+async def chat_ui():
     html_content = """
     <!DOCTYPE html>
     <html lang="pt-BR">
@@ -27,13 +10,13 @@ async def get_chat_ui():
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Hermes Autonomous Agent</title>
         <style>
-            * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+            * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
             body { background-color: #0f172a; color: #f8fafc; display: flex; flex-direction: column; height: 100vh; justify-content: center; align-items: center; }
-            .chat-container { width: 90%; max-width: 800px; height: 85vh; background-color: #1e293b; border-radius: 12px; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #334155; }
-            .chat-header { padding: 20px; background-color: #0f172a; border-bottom: 1px solid #334155; border-top-left-radius: 12px; border-top-right-radius: 12px; }
+            .chat-container { width: 90%; max-width: 850px; height: 85vh; background-color: #1e293b; border-radius: 12px; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #334155; }
+            .chat-header { padding: 20px; background-color: #0f172a; border-bottom: 1px solid #334155; border-top-left-radius: 12px; border-top-right-radius: 12px; display: flex; align-items: center; justify-content: space-between; }
             .chat-header h2 { color: #38bdf8; font-size: 1.25rem; font-weight: 600; }
             .chat-box { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
-            .message { padding: 12px 16px; border-radius: 8px; max-width: 80%; line-height: 1.5; font-size: 0.95rem; }
+            .message { padding: 12px 16px; border-radius: 8px; max-width: 80%; line-height: 1.5; font-size: 0.95rem; word-break: break-word; }
             .user-msg { background-color: #0284c7; color: #fff; align-self: flex-end; border-bottom-right-radius: 2px; }
             .bot-msg { background-color: #334155; color: #f1f5f9; align-self: flex-start; border-bottom-left-radius: 2px; }
             .chat-input-area { padding: 15px; background-color: #0f172a; border-top: 1px solid #334155; display: flex; gap: 10px; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }
@@ -46,13 +29,13 @@ async def get_chat_ui():
     <body>
         <div class="chat-container">
             <div class="chat-header">
-                <h2>🤖 Hermes Autonomous Agent</h2>
+                <h2>🤖 Hermes Autonomous Agent Core</h2>
             </div>
             <div class="chat-box" id="chatBox">
-                <div class="message bot-msg">Olá! Sou o Hermes. Como posso te ajudar hoje?</div>
+                <div class="message bot-msg">Olá! Sou o Hermes. Sistema Multi-Agente & Autocorreção (Self-Healing) ativo. Como posso te ajudar hoje?</div>
             </div>
             <div class="chat-input-area">
-                <input type="text" id="userInput" placeholder="Digite sua mensagem..." onkeydown="if(event.key==='Enter') sendMessage()">
+                <input type="text" id="userInput" placeholder="Digite sua mensagem ou instrução..." onkeydown="if(event.key==='Enter') sendMessage()">
                 <button onclick="sendMessage()">Enviar</button>
             </div>
         </div>
@@ -62,7 +45,6 @@ async def get_chat_ui():
                 const input = document.getElementById('userInput');
                 const chatBox = document.getElementById('chatBox');
                 const text = input.value.trim();
-                
                 if (!text) return;
 
                 const userDiv = document.createElement('div');
@@ -83,13 +65,13 @@ async def get_chat_ui():
 
                     const botDiv = document.createElement('div');
                     botDiv.className = 'message bot-msg';
-                    botDiv.textContent = data.response || "Sem resposta do servidor.";
+                    botDiv.textContent = data.response || data.message || JSON.stringify(data);
                     chatBox.appendChild(botDiv);
                 } catch (err) {
                     const errorDiv = document.createElement('div');
                     errorDiv.className = 'message bot-msg';
                     errorDiv.style.color = '#f87171';
-                    errorDiv.textContent = 'Erro ao se comunicar com o servidor.';
+                    errorDiv.textContent = 'Erro de comunicação com o servidor Hermes.';
                     chatBox.appendChild(errorDiv);
                 }
                 
