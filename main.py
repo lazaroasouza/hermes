@@ -19,6 +19,32 @@ client = genai.Client(api_key=api_key.strip()) if api_key else None
 class ChatPayload(BaseModel):
     message: str
 
+def get_active_model_name():
+    """Consulta o Google AI Studio para descobrir dinamicamente os modelos disponíveis."""
+    if not client:
+        return "gemini-2.5-flash"
+    
+    try:
+        models = list(client.models.list())
+        model_names = [
+            m.name.replace("models/", "") if hasattr(m, "name") else str(m)
+            for m in models
+        ]
+        
+        # 1. Tenta encontrar um modelo 'flash' ativo
+        flash_models = [m for m in model_names if "flash" in m]
+        if flash_models:
+            return flash_models[0]
+            
+        # 2. Caso não ache flash, pega o primeiro disponível
+        if model_names:
+            return model_names[0]
+            
+    except Exception as e:
+        print(f"Erro ao listar modelos automaticamente: {e}")
+        
+    return "gemini-2.5-flash"
+
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     return "<h3>Hermes API está online com Gemini! Acesse <a href='/chat' style='color:#3b82f6;'>/chat</a> para interagir.</h3>"
@@ -30,22 +56,25 @@ async def chat_endpoint(payload: ChatPayload):
     if not client:
         return JSONResponse(content={
             "status": "error",
-            "reply": "⚠️ GEMINI_API_KEY não encontrada nas variáveis de ambiente do Render."
+            "reply": "⚠️ GEMINI_API_KEY não foi configurada nas variáveis de ambiente do Render."
         })
 
+    # Seleção dinâmica do modelo disponível
+    active_model = get_active_model_name()
+
     try:
-        # Modelo oficial recomendado para a nova API
         response = await asyncio.to_thread(
             client.models.generate_content,
-            model="gemini-2.0-flash",
+            model=active_model,
             contents=user_msg,
         )
-        bot_reply = response.text if response.text else "Não foi possível gerar uma resposta."
+        bot_reply = response.text if response.text else "Não foi possível obter resposta."
         return JSONResponse(content={"status": "success", "reply": bot_reply})
+        
     except Exception as e:
         return JSONResponse(content={
             "status": "error",
-            "reply": f"Erro na API do Gemini: {str(e)}"
+            "reply": f"Erro na API do Gemini (tentando modelo '{active_model}'): {str(e)}"
         })
 
 @app.get("/chat", response_class=HTMLResponse)
@@ -133,7 +162,7 @@ async def get_chat_ui():
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'message bot-msg';
                 errorDiv.style.color = '#f87171';
-                errorDiv.textContent = 'Erro de comunicação com o servidor Hermes.';
+                errorDiv.textContent = 'Erro ao se comunicar com o servidor Hermes.';
                 chatBox.appendChild(errorDiv);
             } finally {
                 input.disabled = false;
