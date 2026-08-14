@@ -3,3 +3,5 @@ uvicorn
 pydantic
 google-genai
 duckduckgo-search
+httpx
+beautifulsoup4
