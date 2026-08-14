@@ -1,75 +1,102 @@
-﻿from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+﻿from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from typing import Dict, Any
-import json
-import os
 
-from app.skills.terminal_skill import run_powershell_command
-from app.core.llm import llm_engine
-from app.core.db import clear_history, get_history
-from app.mcp.manager import mcp_hub
+app = FastAPI(title="Hermes Autonomous Agent Core", version="0.1.0")
 
-app = FastAPI(title="Hermes Autonomous Agent Core")
+class ChatPayload(BaseModel):
+    message: str
 
-if os.path.exists("app/static"):
-    app.mount("/static", StaticFiles(directory="app/static"), name="static")
+@app.get("/", response_class=HTMLResponse)
+def read_root():
+    return "<h3>Hermes API está online! Acesse <a href='/chat' style='color:#3b82f6;'>/chat</a> para interagir.</h3>"
 
-class AgentRequest(BaseModel):
-    user_input: str
-    session_id: str = "default-session"
-    role: str = "architect"
+@app.post("/api/chat")
+async def chat_endpoint(payload: ChatPayload):
+    user_msg = payload.message
+    bot_response = f"Processado pelo Hermes: Recebi sua mensagem '{user_msg}'."
+    return {"response": bot_response}
 
-@app.get("/")
-async def root():
-    if os.path.exists("app/static/index.html"):
-        return FileResponse("app/static/index.html")
-    return {
-        "status": "active",
-        "agent": "Hermes Multi-Agent Core",
-        "mcp": await mcp_hub.get_status()
-    }
+@app.get("/chat", response_class=HTMLResponse)
+async def get_chat_ui():
+    html_content = """
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Hermes Autonomous Agent</title>
+        <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+            body { background-color: #0f172a; color: #f8fafc; display: flex; flex-direction: column; height: 100vh; justify-content: center; align-items: center; }
+            .chat-container { width: 90%; max-width: 800px; height: 85vh; background-color: #1e293b; border-radius: 12px; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #334155; }
+            .chat-header { padding: 20px; background-color: #0f172a; border-bottom: 1px solid #334155; border-top-left-radius: 12px; border-top-right-radius: 12px; }
+            .chat-header h2 { color: #38bdf8; font-size: 1.25rem; font-weight: 600; }
+            .chat-box { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+            .message { padding: 12px 16px; border-radius: 8px; max-width: 80%; line-height: 1.5; font-size: 0.95rem; }
+            .user-msg { background-color: #0284c7; color: #fff; align-self: flex-end; border-bottom-right-radius: 2px; }
+            .bot-msg { background-color: #334155; color: #f1f5f9; align-self: flex-start; border-bottom-left-radius: 2px; }
+            .chat-input-area { padding: 15px; background-color: #0f172a; border-top: 1px solid #334155; display: flex; gap: 10px; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }
+            input[type="text"] { flex: 1; padding: 12px 16px; background-color: #1e293b; border: 1px solid #475569; border-radius: 6px; color: #fff; outline: none; font-size: 0.95rem; }
+            input[type="text"]:focus { border-color: #38bdf8; }
+            button { padding: 12px 24px; background-color: #0284c7; border: none; border-radius: 6px; color: #fff; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
+            button:hover { background-color: #0369a1; }
+        </style>
+    </head>
+    <body>
+        <div class="chat-container">
+            <div class="chat-header">
+                <h2>🤖 Hermes Autonomous Agent</h2>
+            </div>
+            <div class="chat-box" id="chatBox">
+                <div class="message bot-msg">Olá! Sou o Hermes. Como posso te ajudar hoje?</div>
+            </div>
+            <div class="chat-input-area">
+                <input type="text" id="userInput" placeholder="Digite sua mensagem..." onkeydown="if(event.key==='Enter') sendMessage()">
+                <button onclick="sendMessage()">Enviar</button>
+            </div>
+        </div>
 
-@app.get("/chat")
-async def chat_ui():
-    if os.path.exists("app/static/index.html"):
-        return FileResponse("app/static/index.html")
-    return JSONResponse(status_code=404, content={"message": "Interface Web não encontrada"})
+        <script>
+            async function sendMessage() {
+                const input = document.getElementById('userInput');
+                const chatBox = document.getElementById('chatBox');
+                const text = input.value.trim();
+                
+                if (!text) return;
 
-@app.get("/api/v1/hermes/history/{session_id}")
-async def fetch_history(session_id: str):
-    return {"session_id": session_id, "history": get_history(session_id)}
+                const userDiv = document.createElement('div');
+                userDiv.className = 'message user-msg';
+                userDiv.textContent = text;
+                chatBox.appendChild(userDiv);
+                
+                input.value = '';
+                chatBox.scrollTop = chatBox.scrollHeight;
 
-@app.delete("/api/v1/hermes/history/{session_id}/clear")
-async def delete_history(session_id: str):
-    clear_history(session_id)
-    return {"status": "cleared", "session_id": session_id}
+                try {
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: text })
+                    });
+                    const data = await response.json();
 
-@app.post("/api/v1/hermes/chat")
-async def hermes_agent_endpoint(request: AgentRequest):
-    user_text = request.user_input.lower()
-
-    if user_text.startswith("execute "):
-        command_to_run = request.user_input[8:].strip()
-        result = await run_powershell_command(command_to_run)
-        return {
-            "session_id": request.session_id,
-            "agent": "Hermes Direct Execution",
-            "provider_used": "Direct Terminal Skill",
-            "status": "completed",
-            "role_active": request.role,
-            "response": f"Comando '{command_to_run}' executado:\n\n{result['stdout']}",
-            "execution_trace": [{"role": "user", "content": request.user_input}, {"role": "tool", "name": "run_powershell_command", "content": json.dumps(result)}]
-        }
-
-    llm_result = await llm_engine.process_chat(request.user_input, request.session_id, active_role=request.role)
-    return {
-        "session_id": request.session_id,
-        "agent": "Hermes Core",
-        "provider_used": llm_result["provider_used"],
-        "role_active": llm_result["role_active"],
-        "status": "completed",
-        "response": llm_result["response"],
-        "execution_trace": llm_result["execution_trace"]
-    }
+                    const botDiv = document.createElement('div');
+                    botDiv.className = 'message bot-msg';
+                    botDiv.textContent = data.response || "Sem resposta do servidor.";
+                    chatBox.appendChild(botDiv);
+                } catch (err) {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'message bot-msg';
+                    errorDiv.style.color = '#f87171';
+                    errorDiv.textContent = 'Erro ao se comunicar com o servidor.';
+                    chatBox.appendChild(errorDiv);
+                }
+                
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
