@@ -1,25 +1,47 @@
-﻿import asyncio
+﻿import os
+import asyncio
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
+from google import genai
 
-app = FastAPI(title="Hermes Autonomous Agent Core", version="0.1.0")
+app = FastAPI(title="Hermes Autonomous Agent Core", version="1.0.0")
+
+# Inicializa o cliente do Gemini usando a GEMINI_API_KEY do ambiente
+api_key = os.getenv("GEMINI_API_KEY")
+client = genai.Client(api_key=api_key) if api_key else None
 
 class ChatPayload(BaseModel):
     message: str
 
 @app.get("/", response_class=HTMLResponse)
 def read_root():
-    return "<h3>Hermes API está online! Acesse <a href='/chat' style='color:#3b82f6;'>/chat</a> para interagir.</h3>"
+    return "<h3>Hermes API está online com Gemini! Acesse <a href='/chat' style='color:#3b82f6;'>/chat</a> para interagir.</h3>"
 
 @app.post("/api/chat")
 async def chat_endpoint(payload: ChatPayload):
-    # Simulação de processamento inteligente dos sub-agentes
-    await asyncio.sleep(0.5)
-    return JSONResponse(content={
-        "status": "success",
-        "reply": f"Hermes recebeu seu comando: '{payload.message}'. Todos os subsistemas e agentes responderam perfeitamente!"
-    })
+    user_msg = payload.message
+
+    if not client:
+        return JSONResponse(content={
+            "status": "error",
+            "reply": "⚠️ GEMINI_API_KEY não foi configurada nas variáveis de ambiente do Render."
+        })
+
+    try:
+        # Chamada assíncrona/executada em threadpool para a LLM
+        response = await asyncio.to_thread(
+            client.models.generate_content,
+            model="gemini-2.5-flash",
+            contents=user_msg,
+        )
+        bot_reply = response.text if response.text else "Não consegui gerar uma resposta."
+        return JSONResponse(content={"status": "success", "reply": bot_reply})
+    except Exception as e:
+        return JSONResponse(content={
+            "status": "error",
+            "reply": f"Erro ao processar com o Gemini: {str(e)}"
+        })
 
 @app.get("/chat", response_class=HTMLResponse)
 async def get_chat_ui():
@@ -36,7 +58,7 @@ async def get_chat_ui():
         .chat-header { padding: 20px; background-color: #0f172a; border-bottom: 1px solid #334155; border-top-left-radius: 12px; border-top-right-radius: 12px; display: flex; align-items: center; justify-content: space-between; }
         .chat-header h2 { color: #38bdf8; font-size: 1.25rem; font-weight: 600; }
         .chat-box { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
-        .message { padding: 12px 16px; border-radius: 8px; max-width: 80%; line-height: 1.5; font-size: 0.95rem; word-break: break-word; }
+        .message { padding: 12px 16px; border-radius: 8px; max-width: 80%; line-height: 1.5; font-size: 0.95rem; word-break: break-word; white-space: pre-wrap; }
         .user-msg { background-color: #0284c7; color: #fff; align-self: flex-end; border-bottom-right-radius: 2px; }
         .bot-msg { background-color: #334155; color: #f1f5f9; align-self: flex-start; border-bottom-left-radius: 2px; }
         .status-msg { background-color: rgba(56, 189, 248, 0.1); color: #38bdf8; border: 1px dashed #0284c7; align-self: flex-start; font-size: 0.85rem; font-style: italic; }
@@ -51,10 +73,10 @@ async def get_chat_ui():
 <body>
     <div class="chat-container">
         <div class="chat-header">
-            <h2>🤖 Hermes Autonomous Agent Core</h2>
+            <h2>🤖 Hermes Autonomous Agent Core (Gemini AI)</h2>
         </div>
         <div class="chat-box" id="chatBox">
-            <div class="message bot-msg">Olá! Sou o Hermes. Envie um comando para interagir!</div>
+            <div class="message bot-msg">Olá! Sou o Hermes, agora alimentado pelo Gemini AI. Como posso te ajudar hoje?</div>
         </div>
         <div class="chat-input-area">
             <input type="text" id="userInput" placeholder="Digite sua mensagem ou instrução..." onkeydown="if(event.key==='Enter') sendMessage()">
@@ -70,7 +92,6 @@ async def get_chat_ui():
             const text = input.value.trim();
             if (!text) return;
 
-            // Insere a mensagem do usuário
             const userDiv = document.createElement('div');
             userDiv.className = 'message user-msg';
             userDiv.textContent = text;
@@ -81,10 +102,9 @@ async def get_chat_ui():
             sendBtn.disabled = true;
             chatBox.scrollTop = chatBox.scrollHeight;
 
-            // Insere indicador de status em tempo real
             const statusDiv = document.createElement('div');
             statusDiv.className = 'message status-msg';
-            statusDiv.textContent = '🧠 [Agentes] Roteando instrução e processando resposta...';
+            statusDiv.textContent = '🧠 [Hermes + Gemini] Pensando e gerando resposta...';
             chatBox.appendChild(statusDiv);
             chatBox.scrollTop = chatBox.scrollHeight;
 
@@ -96,7 +116,7 @@ async def get_chat_ui():
                 });
 
                 const data = await response.json();
-                statusDiv.remove(); // Remove o indicador de status
+                statusDiv.remove();
 
                 const botDiv = document.createElement('div');
                 botDiv.className = 'message bot-msg';
@@ -108,7 +128,7 @@ async def get_chat_ui():
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'message bot-msg';
                 errorDiv.style.color = '#f87171';
-                errorDiv.textContent = 'Erro de comunicação com o servidor Hermes.';
+                errorDiv.textContent = 'Erro ao se comunicar com o servidor Hermes.';
                 chatBox.appendChild(errorDiv);
             } finally {
                 input.disabled = false;

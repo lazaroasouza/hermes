@@ -1,6 +1,4 @@
 ﻿fastapi
 uvicorn
-openai
-python-dotenv
-requests
-aiosqlite
+pydantic
+google-genai
