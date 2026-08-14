@@ -3,12 +3,14 @@ import asyncio
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
-from google import genai
+import google.generativeai as genai
 
 app = FastAPI(title="Hermes Autonomous Agent Core", version="1.0.0")
 
+# Configura a chave de API globalmente
 api_key = os.getenv("GEMINI_API_KEY")
-client = genai.Client(api_key=api_key) if api_key else None
+if api_key:
+    genai.configure(api_key=api_key)
 
 class ChatPayload(BaseModel):
     message: str
@@ -21,20 +23,20 @@ def read_root():
 async def chat_endpoint(payload: ChatPayload):
     user_msg = payload.message
 
-    if not client:
+    if not api_key:
         return JSONResponse(content={
             "status": "error",
             "reply": "⚠️ GEMINI_API_KEY não foi configurada nas variáveis de ambiente do Render."
         })
 
     try:
-        # Modelo oficial estável
-        response = await asyncio.to_thread(
-            client.models.generate_content,
-            model="gemini-1.5-flash",
-            contents=user_msg,
-        )
+        # Instancia o modelo estável gemini-1.5-flash
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        
+        # Executa a chamada em threadpool assíncrona
+        response = await asyncio.to_thread(model.generate_content, user_msg)
         bot_reply = response.text if response.text else "Não consegui gerar uma resposta."
+        
         return JSONResponse(content={"status": "success", "reply": bot_reply})
     except Exception as e:
         return JSONResponse(content={
