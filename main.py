@@ -19,31 +19,47 @@ client = genai.Client(api_key=api_key.strip()) if api_key else None
 class ChatPayload(BaseModel):
     message: str
 
-def get_active_model_name():
-    """Consulta o Google AI Studio para descobrir dinamicamente os modelos disponíveis."""
+async def generate_response_with_fallback(user_msg: str) -> str:
+    """Tenta gerar conteúdo testando dinamicamente os modelos disponíveis."""
     if not client:
-        return "gemini-2.5-flash"
+        return "⚠️ GEMINI_API_KEY não foi configurada nas variáveis de ambiente do Render."
+
+    candidate_models = []
     
+    # 1. Consulta dinamicamente a API do Google AI Studio
     try:
-        models = list(client.models.list())
-        model_names = [
-            m.name.replace("models/", "") if hasattr(m, "name") else str(m)
-            for m in models
-        ]
-        
-        # 1. Tenta encontrar um modelo 'flash' ativo
-        flash_models = [m for m in model_names if "flash" in m]
-        if flash_models:
-            return flash_models[0]
-            
-        # 2. Caso não ache flash, pega o primeiro disponível
-        if model_names:
-            return model_names[0]
-            
+        models_page = client.models.list()
+        for m in models_page:
+            name = m.name.replace("models/", "") if hasattr(m, "name") else str(m)
+            # Filtra apenas modelos de chat/texto Gemini (ignora embeddings, imagen, etc.)
+            if "gemini" in name.lower() and not any(x in name.lower() for x in ["embed", "imagen", "aqa", "tts", "stt"]):
+                candidate_models.append(name)
     except Exception as e:
-        print(f"Erro ao listar modelos automaticamente: {e}")
-        
-    return "gemini-2.5-flash"
+        print(f"Aviso ao listar modelos: {e}")
+
+    # Lista de padrões caso a listagem falhe ou venha vazia
+    defaults = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash-lite"]
+    for d in defaults:
+        if d not in candidate_models:
+            candidate_models.append(d)
+
+    last_error = ""
+    # 2. Testa cada modelo em sequência até obter uma resposta válida
+    for model_name in candidate_models:
+        try:
+            response = await asyncio.to_thread(
+                client.models.generate_content,
+                model=model_name,
+                contents=user_msg,
+            )
+            if response and response.text:
+                return response.text
+        except Exception as e:
+            last_error = str(e)
+            print(f"Modelo '{model_name}' indisponível ({e}). Tentando próximo...")
+            continue
+
+    return f"Erro na API do Gemini. Nenhum modelo respondeu com sucesso. Último erro: {last_error}"
 
 @app.get("/", response_class=HTMLResponse)
 def read_root():
@@ -51,31 +67,9 @@ def read_root():
 
 @app.post("/api/chat")
 async def chat_endpoint(payload: ChatPayload):
-    user_msg = payload.message
-
-    if not client:
-        return JSONResponse(content={
-            "status": "error",
-            "reply": "⚠️ GEMINI_API_KEY não foi configurada nas variáveis de ambiente do Render."
-        })
-
-    # Seleção dinâmica do modelo disponível
-    active_model = get_active_model_name()
-
-    try:
-        response = await asyncio.to_thread(
-            client.models.generate_content,
-            model=active_model,
-            contents=user_msg,
-        )
-        bot_reply = response.text if response.text else "Não foi possível obter resposta."
-        return JSONResponse(content={"status": "success", "reply": bot_reply})
-        
-    except Exception as e:
-        return JSONResponse(content={
-            "status": "error",
-            "reply": f"Erro na API do Gemini (tentando modelo '{active_model}'): {str(e)}"
-        })
+    bot_reply = await generate_response_with_fallback(payload.message)
+    status = "error" if bot_reply.startswith("Erro") or bot_reply.startswith("⚠️") else "success"
+    return JSONResponse(content={"status": status, "reply": bot_reply})
 
 @app.get("/chat", response_class=HTMLResponse)
 async def get_chat_ui():
