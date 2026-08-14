@@ -3,12 +3,20 @@ import asyncio
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
-from google import genai
+import google.generativeai as genai
 
 app = FastAPI(title="Hermes Autonomous Agent Core", version="1.0.0")
 
-api_key = os.getenv("GEMINI_API_KEY")
-client = genai.Client(api_key=api_key) if api_key else None
+# Captura inteligente da chave de API considerando variações do nome cadastrado no Render
+api_key = (
+    os.getenv("GEMINI_API_KEY") or
+    os.getenv("Gemini API Key") or
+    os.getenv("GEMINI_API_KEY_") or
+    os.getenv("gemini_api_key")
+)
+
+if api_key:
+    genai.configure(api_key=api_key.strip())
 
 class ChatPayload(BaseModel):
     message: str
@@ -21,32 +29,36 @@ def read_root():
 async def chat_endpoint(payload: ChatPayload):
     user_msg = payload.message
 
-    if not client:
+    if not api_key:
         return JSONResponse(content={
             "status": "error",
-            "reply": "⚠️ GEMINI_API_KEY não foi configurada nas variáveis de ambiente do Render."
+            "reply": "⚠️ Variável da chave do Gemini não foi encontrada no ambiente. Verifique o Render."
         })
 
-    # Lista de modelos suportados para tentar em sequência
-    models_to_try = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash"]
-    last_err = None
+    # Lista de nomes de modelos aceitos pela API do Google AI Studio
+    candidate_models = [
+        "gemini-1.5-flash",
+        "gemini-1.5-pro",
+        "gemini-2.0-flash-exp",
+        "gemini-1.0-pro"
+    ]
 
-    for model_name in models_to_try:
+    last_error = None
+
+    for model_name in candidate_models:
         try:
-            response = await asyncio.to_thread(
-                client.models.generate_content,
-                model=model_name,
-                contents=user_msg,
-            )
+            model = genai.GenerativeModel(model_name)
+            response = await asyncio.to_thread(model.generate_content, user_msg)
+            
             if response and response.text:
                 return JSONResponse(content={"status": "success", "reply": response.text})
         except Exception as e:
-            last_err = str(e)
+            last_error = str(e)
             continue
 
     return JSONResponse(content={
         "status": "error",
-        "reply": f"Erro ao processar com os modelos Gemini disponíveis: {last_err}"
+        "reply": f"Erro ao processar com os modelos Gemini: {last_error}"
     })
 
 @app.get("/chat", response_class=HTMLResponse)
@@ -82,7 +94,7 @@ async def get_chat_ui():
             <h2>🤖 Hermes Autonomous Agent Core (Gemini AI)</h2>
         </div>
         <div class="chat-box" id="chatBox">
-            <div class="message bot-msg">Olá! Sou o Hermes. Envie uma mensagem para testar a comunicação com o Gemini!</div>
+            <div class="message bot-msg">Olá! Sou o Hermes, alimentado pelo Gemini AI. Como posso te ajudar hoje?</div>
         </div>
         <div class="chat-input-area">
             <input type="text" id="userInput" placeholder="Digite sua mensagem ou instrução..." onkeydown="if(event.key==='Enter') sendMessage()">
@@ -110,7 +122,7 @@ async def get_chat_ui():
 
             const statusDiv = document.createElement('div');
             statusDiv.className = 'message status-msg';
-            statusDiv.textContent = '🧠 [Hermes + Gemini] Conectando ao modelo e gerando resposta...';
+            statusDiv.textContent = '🧠 [Hermes + Gemini] Pensando e gerando resposta...';
             chatBox.appendChild(statusDiv);
             chatBox.scrollTop = chatBox.scrollHeight;
 
