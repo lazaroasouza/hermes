@@ -2,3 +2,4 @@
 uvicorn
 pydantic
 google-genai
+duckduckgo-search
