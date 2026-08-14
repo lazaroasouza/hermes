@@ -7,7 +7,6 @@ import google.generativeai as genai
 
 app = FastAPI(title="Hermes Autonomous Agent Core", version="1.0.0")
 
-# Configura a chave de API globalmente
 api_key = os.getenv("GEMINI_API_KEY")
 if api_key:
     genai.configure(api_key=api_key)
@@ -29,20 +28,31 @@ async def chat_endpoint(payload: ChatPayload):
             "reply": "⚠️ GEMINI_API_KEY não foi configurada nas variáveis de ambiente do Render."
         })
 
-    try:
-        # Instancia o modelo estável gemini-1.5-flash
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        
-        # Executa a chamada em threadpool assíncrona
-        response = await asyncio.to_thread(model.generate_content, user_msg)
-        bot_reply = response.text if response.text else "Não consegui gerar uma resposta."
-        
-        return JSONResponse(content={"status": "success", "reply": bot_reply})
-    except Exception as e:
-        return JSONResponse(content={
-            "status": "error",
-            "reply": f"Erro ao processar com o Gemini: {str(e)}"
-        })
+    # Lista de modelos por ordem de prioridade para garantir fallback
+    candidate_models = [
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-pro-latest",
+        "models/gemini-1.5-flash",
+        "gemini-pro"
+    ]
+
+    last_error = None
+
+    for model_name in candidate_models:
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = await asyncio.to_thread(model.generate_content, user_msg)
+            
+            if response and response.text:
+                return JSONResponse(content={"status": "success", "reply": response.text})
+        except Exception as e:
+            last_error = e
+            continue
+
+    return JSONResponse(content={
+        "status": "error",
+        "reply": f"Erro ao processar com os modelos Gemini: {str(last_error)}"
+    })
 
 @app.get("/chat", response_class=HTMLResponse)
 async def get_chat_ui():
