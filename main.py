@@ -1,7 +1,6 @@
 ﻿import asyncio
-import json
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 app = FastAPI(title="Hermes Autonomous Agent Core", version="0.1.0")
@@ -11,26 +10,16 @@ class ChatPayload(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 def read_root():
-    return "<h3>Hermes API esta online! Acesse <a href='/chat' style='color:#3b82f6;'>/chat</a> para interagir.</h3>"
+    return "<h3>Hermes API está online! Acesse <a href='/chat' style='color:#3b82f6;'>/chat</a> para interagir.</h3>"
 
-@app.post("/api/chat/stream")
-async def chat_stream(payload: ChatPayload):
-    async def event_generator():
-        user_msg = payload.message
-        
-        yield f"data: {json.dumps({'type': 'status', 'content': '🧠 [Roteador] Analisando a instrucao recebida...'})}\n\n"
-        await asyncio.sleep(1.2)
-        
-        yield f"data: {json.dumps({'type': 'status', 'content': '💻 [Dev Coder] Processando logica e estruturando o codigo...'})}\n\n"
-        await asyncio.sleep(1.5)
-        
-        yield f"data: {json.dumps({'type': 'status', 'content': '🧪 [QA Tester] Executando verificacoes e testes de integridade...'})}\n\n"
-        await asyncio.sleep(1.2)
-        
-        final_reply = f"Hermes processou com sucesso sua mensagem: '{user_msg}'."
-        yield f"data: {json.dumps({'type': 'final', 'content': final_reply})}\n\n"
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+@app.post("/api/chat")
+async def chat_endpoint(payload: ChatPayload):
+    # Simulação de processamento inteligente dos sub-agentes
+    await asyncio.sleep(0.5)
+    return JSONResponse(content={
+        "status": "success",
+        "reply": f"Hermes recebeu seu comando: '{payload.message}'. Todos os subsistemas e agentes responderam perfeitamente!"
+    })
 
 @app.get("/chat", response_class=HTMLResponse)
 async def get_chat_ui():
@@ -65,7 +54,7 @@ async def get_chat_ui():
             <h2>🤖 Hermes Autonomous Agent Core</h2>
         </div>
         <div class="chat-box" id="chatBox">
-            <div class="message bot-msg">Olá! Sou o Hermes. Envie um comando para acompanhar minhas ações em tempo real!</div>
+            <div class="message bot-msg">Olá! Sou o Hermes. Envie um comando para interagir!</div>
         </div>
         <div class="chat-input-area">
             <input type="text" id="userInput" placeholder="Digite sua mensagem ou instrução..." onkeydown="if(event.key==='Enter') sendMessage()">
@@ -81,6 +70,7 @@ async def get_chat_ui():
             const text = input.value.trim();
             if (!text) return;
 
+            // Insere a mensagem do usuário
             const userDiv = document.createElement('div');
             userDiv.className = 'message user-msg';
             userDiv.textContent = text;
@@ -91,53 +81,34 @@ async def get_chat_ui():
             sendBtn.disabled = true;
             chatBox.scrollTop = chatBox.scrollHeight;
 
+            // Insere indicador de status em tempo real
+            const statusDiv = document.createElement('div');
+            statusDiv.className = 'message status-msg';
+            statusDiv.textContent = '🧠 [Agentes] Roteando instrução e processando resposta...';
+            chatBox.appendChild(statusDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
             try {
-                const response = await fetch('/api/chat/stream', {
+                const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: text })
                 });
 
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let activeStatusDiv = null;
+                const data = await response.json();
+                statusDiv.remove(); // Remove o indicador de status
 
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
+                const botDiv = document.createElement('div');
+                botDiv.className = 'message bot-msg';
+                botDiv.textContent = data.reply;
+                chatBox.appendChild(botDiv);
 
-                    const chunk = decoder.decode(value);
-                    const lines = chunk.split('\n');
-
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const data = JSON.parse(line.replace('data: ', ''));
-
-                            if (data.type === 'status') {
-                                if (!activeStatusDiv) {
-                                    activeStatusDiv = document.createElement('div');
-                                    activeStatusDiv.className = 'message status-msg';
-                                    chatBox.appendChild(activeStatusDiv);
-                                }
-                                activeStatusDiv.textContent = data.content;
-                            } else if (data.type === 'final') {
-                                if (activeStatusDiv) {
-                                    activeStatusDiv.remove();
-                                }
-                                const botDiv = document.createElement('div');
-                                botDiv.className = 'message bot-msg';
-                                botDiv.textContent = data.content;
-                                chatBox.appendChild(botDiv);
-                            }
-                            chatBox.scrollTop = chatBox.scrollHeight;
-                        }
-                    }
-                }
             } catch (err) {
+                statusDiv.remove();
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'message bot-msg';
                 errorDiv.style.color = '#f87171';
-                errorDiv.textContent = 'Erro ao se comunicar com o servidor Hermes.';
+                errorDiv.textContent = 'Erro de comunicação com o servidor Hermes.';
                 chatBox.appendChild(errorDiv);
             } finally {
                 input.disabled = false;
