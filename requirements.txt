@@ -1,7 +1,9 @@
 ﻿fastapi
 uvicorn
 pydantic
-google-genai
-duckduckgo-search
 httpx
+python-dotenv
+google-genai
 beautifulsoup4
+websockets
+mcp
