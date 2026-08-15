@@ -136,52 +136,100 @@ async def serve_chat_ui():
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Hermes 3.6 - Chat UI</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hermes 3.6 Enterprise Core</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; background: #0f172a; color: #f8fafc; display: flex; justify-content: center; height: 100vh; margin: 0; align-items: center; }
-        .chat-container { width: 450px; background: #1e293b; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); display: flex; flex-direction: column; height: 500px; }
-        .chat-box { flex: 1; overflow-y: auto; border: 1px solid #334155; padding: 10px; border-radius: 8px; margin-bottom: 10px; background: #0f172a; }
-        .input-group { display: flex; gap: 10px; }
-        input { flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #475569; background: #334155; color: #fff; }
-        button { padding: 10px 15px; background: #3b82f6; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 700; }
-        button:hover { background: #2563eb; }
-        .message { margin-bottom: 8px; padding: 6px 10px; border-radius: 6px; font-size: 14px; }
-        .user-msg { background: #1e3a8a; text-align: right; }
-        .bot-msg { background: #334155; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #080c14; color: #f1f5f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 15px; }
+        .app-container { width: 100%; max-width: 1100px; height: 92vh; background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); }
+        .header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; background: #131c31; border-bottom: 1px solid #1e293b; }
+        .brand { display: flex; align-items: center; gap: 10px; font-size: 1.15rem; font-weight: 700; color: #38bdf8; }
+        .header-right { display: flex; align-items: center; gap: 12px; }
+        .status-badge { background: #064e3b; color: #34d399; border: 1px solid #059669; padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+        .reset-btn { background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .reset-btn:hover { background: #dc2626; }
+        .chat-box { flex: 1; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; background: #080c14; }
+        .message { max-width: 90%; padding: 14px 18px; border-radius: 8px; font-size: 0.95rem; line-height: 1.6; }
+        .user-msg { align-self: flex-end; background: #0284c7; color: #ffffff; border-bottom-right-radius: 2px; }
+        .bot-msg { align-self: flex-start; width: 95%; background: #0f172a; border: 1px solid #1e293b; color: #f1f5f9; border-bottom-left-radius: 2px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3); }
+        .bot-msg h1, .bot-msg h2, .bot-msg h3 { color: #38bdf8; margin: 12px 0 8px 0; border-bottom: 1px solid #334155; padding-bottom: 4px; }
+        .bot-msg ul, .bot-msg ol { margin: 8px 0 8px 20px; }
+        .bot-msg p { margin-bottom: 8px; }
+        .bot-msg pre { background: #020617; padding: 14px; border-radius: 6px; overflow-x: auto; margin: 12px 0; border: 1px solid #1e293b; font-family: "Fira Code", monospace, sans-serif; }
+        .bot-msg code { background: #020617; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #38bdf8; }
+        .bot-msg pre code { background: transparent; padding: 0; color: #e2e8f0; }
+        .input-area { padding: 18px 24px; background: #0f172a; border-top: 1px solid #1e293b; display: flex; gap: 12px; }
+        .input-area input { flex: 1; background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 12px 18px; color: white; font-size: 0.95rem; outline: none; }
+        .input-area input:focus { border-color: #0284c7; }
+        .send-btn { background: #0284c7; color: white; border: none; padding: 12px 26px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .send-btn:hover { background: #0369a1; }
     </style>
 </head>
 <body>
-    <div class="chat-container">
-        <h3>Hermes 3.6 - OmniChannel</h3>
-        <div id="chatBox" class="chat-box"></div>
-        <div class="input-group">
-            <input type="text" id="msgInput" placeholder="Digite sua mensagem..." onkeypress="if(event.key==='Enter')sendMsg()">
-            <button onclick="sendMsg()">Enviar</button>
+    <div class="app-container">
+        <div class="header">
+            <div class="brand">
+                <span>🤖</span> Hermes 3.6 Enterprise Core
+            </div>
+            <div class="header-right">
+                <div class="status-badge">
+                    <span>🟢</span> Web + Python + Memory Active
+                </div>
+                <button class="reset-btn" onclick="resetMemory()">🗑️ Resetar Memória</button>
+            </div>
+        </div>
+        <div class="chat-box" id="chatBox"></div>
+        <div class="input-area">
+            <input type="text" id="msgInput" placeholder="Hermes, crie um Agente Especialista..." onkeypress="if(event.key==='Enter')sendMsg()">
+            <button class="send-btn" onclick="sendMsg()">Enviar</button>
         </div>
     </div>
     <script>
+        function appendMsg(role, text) {
+            const box = document.getElementById('chatBox');
+            const div = document.createElement('div');
+            div.className = `message ${role}-msg`;
+            if (role === 'bot') {
+                div.innerHTML = marked.parse(text);
+            } else {
+                div.innerText = text;
+            }
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+
         async function sendMsg() {
-            const t = document.getElementById('msgInput');
-            const e = document.getElementById('chatBox');
-            const s = t.value.trim();
-            if (!s) return;
-            e.innerHTML += `<div class="message user-msg"><b>Você:</b> ${s}</div>`;
-            t.value = '';
-            e.scrollTop = e.scrollHeight;
+            const input = document.getElementById('msgInput');
+            const text = input.value.trim();
+            if (!text) return;
+            appendMsg('user', text);
+            input.value = '';
+            
             try {
-                const response = await fetch('/api/chat', {
+                const res = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: s, project_id: 'default_project' })
+                    body: JSON.stringify({ message: text, project_id: 'default_project' })
                 });
-                const data = await response.json();
-                const reply = data.reply || data.response || JSON.stringify(data);
-                e.innerHTML += `<div class="message bot-msg"><b>Hermes:</b> ${reply}</div>`;
-            } catch (err) {
-                e.innerHTML += `<div class="message bot-msg" style="color:#f87171"><b>Erro:</b> Falha na comunicação.</div>`;
+                const data = await res.json();
+                const reply = data.reply || data.response || (typeof data === 'string' ? data : JSON.stringify(data));
+                appendMsg('bot', reply);
+            } catch(e) {
+                appendMsg('bot', '**Erro:** Falha na comunicação com o servidor.');
             }
-            e.scrollTop = e.scrollHeight;
+        }
+
+        async function resetMemory() {
+            if (confirm('Deseja realmente resetar a memória da conversa?')) {
+                document.getElementById('chatBox').innerHTML = '';
+                try {
+                    await fetch('/api/reset', { method: 'POST' });
+                } catch(e) {}
+                appendMsg('bot', '🧹 **Memória resetada com sucesso!**');
+            }
         }
     </script>
 </body>
 </html>"""
+
