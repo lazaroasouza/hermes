@@ -157,6 +157,12 @@ async def serve_chat_ui():
         .bot-msg ul, .bot-msg ol { margin: 8px 0 8px 20px; }
         .bot-msg p { margin-bottom: 8px; }
         .bot-msg pre { background: #020617; padding: 14px; border-radius: 6px; overflow-x: auto; margin: 12px 0; border: 1px solid #1e293b; font-family: "Fira Code", monospace, sans-serif; }
+        
+        .bot-msg table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.85rem; }
+        .bot-msg th, .bot-msg td { border: 1px solid #334155; padding: 8px 12px; text-align: left; }
+        .bot-msg th { background: #131c31; color: #38bdf8; font-weight: 700; border-bottom: 2px solid #0284c7; }
+        .bot-msg tr:nth-child(even) { background: rgba(255, 255, 255, 0.02); }
+
         .bot-msg code { background: #020617; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #38bdf8; }
         .bot-msg pre code { background: transparent; padding: 0; color: #e2e8f0; }
         .input-area { padding: 18px 24px; background: #0f172a; border-top: 1px solid #1e293b; display: flex; gap: 12px; }
