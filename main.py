@@ -4,9 +4,9 @@ from pydantic import BaseModel
 from typing import Optional
 
 app = FastAPI(
-    title="Hermes Autonomous Enterprise Core",
+    title="Hermes 3.0 Enterprise Core",
     version="3.0.0",
-    description="Multi-Tenant Enterprise Core com Workspaces Isolados por Projeto"
+    description="Core Híbrido: Suporte Local (Offline) e Nuvem (Render)"
 )
 
 class ChatPayload(BaseModel):
@@ -15,23 +15,24 @@ class ChatPayload(BaseModel):
 
 @app.get("/")
 def read_root():
-    return {"status": "ONLINE", "system": "Hermes 3.0 Multi-Tenant Enterprise Core"}
+    # Detecta se está no Render ou em ambiente local
+    env_type = "Render Cloud" if os.getenv("RENDER") else "Local Machine (Offline Ready)"
+    return {"status": "ONLINE", "environment": env_type}
 
 @app.post("/api/chat")
 async def chat_endpoint(payload: ChatPayload):
     try:
-        # Define e garante a criação do workspace isolado do projeto
         project_slug = payload.project_id.strip().replace(" ", "_").lower()
         workspace_dir = os.path.join(os.getcwd(), "projects", project_slug)
         os.makedirs(os.path.join(workspace_dir, "outputs"), exist_ok=True)
         os.makedirs(os.path.join(workspace_dir, "skills"), exist_ok=True)
 
-        # Aqui o Hermes opera exclusivamente dentro do diretório do projeto isolado
         return {
             "status": "success",
+            "environment": "Cloud" if os.getenv("RENDER") else "Local",
             "project_id": project_slug,
             "workspace": workspace_dir,
-            "response": f"[Projeto: {project_slug}] Mensagem processada de forma 100% isolada no workspace dedicado."
+            "response": f"[Projeto: {project_slug}] Processado com sucesso no workspace isolado."
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
