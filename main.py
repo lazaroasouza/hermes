@@ -1,3 +1,5 @@
+from fastapi import FastAPI
+app = FastAPI()
 ﻿from fastapi.responses import HTMLResponse
 
 @app.get("/chat", response_class=HTMLResponse)
